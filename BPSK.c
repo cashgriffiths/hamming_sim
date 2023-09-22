@@ -29,7 +29,8 @@ int main(int argc, char *argv[])
    }
 
    float EbNodB, EcNodB, EcNo, sigma, sigsqrd, R=(float)k/n;  // change to R = (float)k/n if add coding
-   int i, bit_errs=0, blk_errs=0, flag, blk_cnt=0;
+   int i, blk_errs=0, flag;
+   long blk_cnt=0, bit_errs=0;
    int N, blk_errs_max = 150;   // 150 block errors should provide sufficient reliability
                                 // in the measurement of error probabilities
 
@@ -38,11 +39,11 @@ int main(int argc, char *argv[])
    EbNodB = atof(argv[1]);
    N = atoi(argv[2]);      // for convenience, N should be even
 
-   int Nc = ceil((float) (N + (k - N % k))*n/k);
+   int Nc = ceil((float) N/k) * n;
+   // printf("%d\n", Nc);
    float x[N], r[Nc];
    uint8_t y[N];
    uint8_t m[N], c[Nc];
-//    memset(c, 0, Nc);
 
    EcNodB = EbNodB + 10*log10(R);  // general formula *if* there was coding
    EcNo = pow(10.0, EcNodB/10.0);
@@ -53,6 +54,10 @@ int main(int argc, char *argv[])
 
    while(blk_errs < blk_errs_max)
    {
+      memset(m, 0, N);
+      memset(c, 0, Nc);
+      memset(r, 0, Nc);
+      memset(y, 0, N);
       blk_cnt++;
       // get a block of data
       for(i=0; i<N; i++) m[i] = (rand()>>5) & 0x1;
@@ -65,8 +70,12 @@ int main(int argc, char *argv[])
 
       hamming_decoder(r, y, Nc);
 
+      /*
+         Debug printing
+      */
+
       // printf("\nm: ");
-      // for (int i = 0; i < N; i++) printf("%d", m[i] % 5);
+      // for (int i = 0; i < N; i++) printf("%d", m[i]);
       // printf("\nc: ");
 
       // for (int i = 0; i < Nc; i++) printf("%d", c[i]);
@@ -79,12 +88,13 @@ int main(int argc, char *argv[])
       // printf("\n");
       // printf("\n");
 
+      // getchar();
+
       // count bit errors and block errors
       flag = 0;
       for(i=0; i<N; i++)
          if(demap(y[i]) != m[i]) { bit_errs++; flag = 1; }
       if(flag) blk_errs++;
-      // getchar();
    }
 
    printf("bit-error rate = %10.2e   block-error rate = %10.2e \n",
@@ -125,20 +135,26 @@ uint8_t m[], c[];
 int message_len;
 {
    
-    for (int idx_c = 0, idx_m = 0; idx_m < message_len + (message_len % k); idx_c += n, idx_m += k) {
-        long enc_reg = 0;
+    for (int idx_c = 0, idx_m = 0; idx_m < ceil((float) message_len/k)*k; idx_c += n, idx_m += k) {
+        int enc_reg = 0;
         for (int i = 0; i < n; i++) {
+            // for (int i = 3; i >= 0; i--) printf("%d", (enc_reg >> i) & 0b1);
+            // printf("\n");
             uint8_t parity = enc_reg & 0b1;
-            uint8_t mb = idx_m >= message_len ? 0 : m[idx_m + i];
+            uint8_t mb = idx_m + i >= message_len ? 0 : m[idx_m + i]; // zero pad
             uint8_t f = parity ^ mb;
             if (i >= k) f = 0;
             enc_reg >>= 1;
             enc_reg ^= (f ? taps : 0);
             c[idx_c + i] = i < k ? mb : parity;
-            // for (int i = 0; i < mesage_len; i++) printf("%d", m[i]);
+            // for(int i = 0; i < k; i++) printf("%d", m[idx_m + i]);
             // printf("\n");
-            // for (int i = 0; i < ceil((float) message_len*n/k); i++) printf("%d", c[i]);
-            // printf("\n%ld\n", enc_reg);
+            // for(int i = 0; i < n; i++) printf("%d", c[idx_c + i]);
+            // printf("\n");
+
+            // for (int i = 3; i >= 0; i--) printf("%d", (enc_reg >> i) & 0b1);
+            // printf("\n\n");
+            
             // getchar();
         }
     }
@@ -149,28 +165,20 @@ float r[];
 uint8_t y[];
 int message_len;
 {
-   uint8_t h[message_len];
-   for (int i = 0; i<message_len; i++) h[i] = demap(r[i]);
    for (int idx = 0, idx_y = 0; idx < message_len; idx += n, idx_y += k) {
-        long dec_reg = 0;
+        int dec_reg = 0;
         for (int i = 0; i < n; i++) {
             uint8_t parity = dec_reg & 0b1;
-            uint8_t mb = h[idx + i];
+            uint8_t mb = demap(r[idx + i]);
             uint8_t f = parity ^ mb;
-            // if (i >= k) f = 0;
             dec_reg >>= 1;
             dec_reg ^= (f ? taps : 0);
             if (i < k) y[idx_y + i] = mb;
-            // for (int i = 0; i < message_len; i++) printf("%d", h[idx + i]);
-            // printf("\n");
-            // if (i < k)for (int i = 0; i < ceil((float) message_len*k/n); i++) printf("%d", y[idx_y + i]);
-            // printf("\n%ld\n", dec_reg);
-            // getchar();
         }
-        int syndrome = dec_reg;
-        if (syndrome)
-        for (int s = 0; s<n; s++) {
-            if (syndromes[s] == syndrome) {
+        // decoder register holds remainder
+        // nonzero remainder = error occurred
+        if (dec_reg) for (int s = 0; s<n; s++) {
+            if (syndromes[s] == dec_reg) {
                y[idx_y + s] ^= 1;
                break;
             }
@@ -196,6 +204,5 @@ void generate_syndromes()
       }
       for (int j = n; j < 2*n-k; j++)
          syndromes[i] += c[j] << (j - n);
-      // printf("%d\n", syndromes[i]);
    }
 }
