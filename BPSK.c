@@ -14,11 +14,14 @@ const short
         k = 11; 
 
 int syndromes[n];
+int codewords[1 << k];
 
 void awgn();
 void hamming_encoder();
-void hamming_decoder();
+void hamming_decoder_hard();
+void hamming_decoder_soft();
 void generate_syndromes();
+void generate_codewords();
 
 int main(int argc, char *argv[])
 {
@@ -42,7 +45,7 @@ int main(int argc, char *argv[])
    int Nc = ceil((float) N/k) * n;
    // printf("%d\n", Nc);
    float x[N], r[Nc];
-   uint8_t y[N];
+   uint8_t y[N], y2[N];
    uint8_t m[N], c[Nc];
 
    EcNodB = EbNodB + 10*log10(R);  // general formula *if* there was coding
@@ -51,6 +54,7 @@ int main(int argc, char *argv[])
    sigma = sqrt(sigsqrd);
 
    generate_syndromes();
+   generate_codewords();
 
    while(blk_errs < blk_errs_max)
    {
@@ -68,7 +72,8 @@ int main(int argc, char *argv[])
       // converts (0, 1) to (-1, +1))
       awgn(sigma, c, r, Nc);
 
-      hamming_decoder(r, y, Nc);
+      // hamming_decoder_hard(r, y, Nc);
+      hamming_decoder_soft(r, y, Nc);
 
       /*
          Debug printing
@@ -94,7 +99,7 @@ int main(int argc, char *argv[])
       flag = 0;
       for(i=0; i<N; i++)
          if(demap(y[i]) != m[i]) { bit_errs++; flag = 1; }
-      if(flag) blk_errs++;
+      if(flag) blk_errs++; 
    }
 
    printf("bit-error rate = %10.2e   block-error rate = %10.2e \n",
@@ -160,7 +165,7 @@ int message_len;
     }
 }
 
-void hamming_decoder(r, y, message_len) 
+void hamming_decoder_hard(r, y, message_len) 
 float r[];
 uint8_t y[];
 int message_len;
@@ -186,6 +191,27 @@ int message_len;
     }
 }
 
+void hamming_decoder_soft(r, y, message_len) 
+float r[];
+uint8_t y[];
+int message_len;
+{p
+   for (int idx_r = 0, idx_y = 0; idx_r < message_len; idx_r += n, idx_y += k) {
+      float d = n * n;
+      int codeword_id = 0;
+      for (int i = 0; i < (1 << k); i++) {
+         float temp = 0;
+         for (int j = 0; j < n; j++) {
+            uint8_t c = (codewords[i] >> j) & 0b1;
+            temp += pow(map(c) - r[idx_r + j], 2);
+         } if (temp <= d) { d = temp; codeword_id = i; }
+      } 
+      for (int i = 0; i < k; i++) {
+         y[idx_y + i] = (codewords[codeword_id] >> i) & 0b1;
+      }
+   }
+}
+
 // modified encoder to create error syndromes
 void generate_syndromes() 
 {
@@ -204,5 +230,20 @@ void generate_syndromes()
       }
       for (int j = n; j < 2*n-k; j++)
          syndromes[i] += c[j] << (j - n);
+   }
+}
+
+// create all possible codewords givn {n, k} hamming code
+void generate_codewords() 
+{
+   int c_i;
+   uint8_t m[k], c[n];
+   for (int i = 0; i < (1 << k); i++) {
+      memset(m, 0, k);
+      for (int j = 0; j < k; j++) m[j] = (i >> j) & 0b1;
+      hamming_encoder(m, c, k);
+      c_i = 0;
+      for (int j = 0; j < n; j++) c_i |= c[j] << j; 
+      codewords[i] = c_i;
    }
 }
