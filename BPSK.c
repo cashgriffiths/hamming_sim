@@ -195,7 +195,7 @@ void hamming_decoder_soft(r, y, message_len)
 float r[];
 uint8_t y[];
 int message_len;
-{p
+{
    for (int idx_r = 0, idx_y = 0; idx_r < message_len; idx_r += n, idx_y += k) {
       float d = n * n;
       int codeword_id = 0;
