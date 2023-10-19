@@ -25,16 +25,16 @@ void generate_codewords();
 
 int main(int argc, char *argv[])
 {
-   if(argc != 3)
+   if(argc != 4)
    {
-      printf("\nUsage: BPSK Eb/No(dB) data-block-size \n\n");
+      printf("\nUsage: BPSK Eb/No(dB) data-block-size hard-or-soft \n\n");
       exit(1);
    }
 
    float EbNodB, EcNodB, EcNo, sigma, sigsqrd, R=(float)k/n;  // change to R = (float)k/n if add coding
    int i, blk_errs=0, flag;
    long blk_cnt=0, bit_errs=0;
-   int N, blk_errs_max = 150;   // 150 block errors should provide sufficient reliability
+   int N, blk_errs_max = 100;   // 100 block errors should provide sufficient reliability
                                 // in the measurement of error probabilities
 
    srand(time(NULL));  // choose random seed for rand()
@@ -71,9 +71,8 @@ int main(int argc, char *argv[])
       // send over additive white Gaussian noise (AWGN) channel (which also
       // converts (0, 1) to (-1, +1))
       awgn(sigma, c, r, Nc);
-
-      // hamming_decoder_hard(r, y, Nc);
-      hamming_decoder_soft(r, y, Nc);
+      if (strcmp(argv[3], "soft")) hamming_decoder_hard(r, y, Nc);
+      else hamming_decoder_soft(r, y, Nc);
 
       /*
          Debug printing
@@ -102,7 +101,8 @@ int main(int argc, char *argv[])
       if(flag) blk_errs++; 
    }
 
-   printf("bit-error rate = %10.2e   block-error rate = %10.2e \n",
+   printf("decoding method: %s\n", argv[3]);
+   printf("bit-error rate = %10.2e\nblock-error rate = %10.2e \n",
              (float)bit_errs/(N*blk_cnt), (float)blk_errs/blk_cnt);
 
    // NOTE: When the bit-error rate Pb is Pb << 1 (usual case),

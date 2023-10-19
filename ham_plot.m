@@ -1,7 +1,7 @@
 x = 3:7;
 y_h = [1.27e-1 5.94e-2 2.17e-2 6.05e-3 1.07e-3];
-y_s = [4.86e-2 1.66e-2 3.55e-3 5.28e-4 5.35e-6];
-y_u = [3.97e-1 2.90e-1 1.58e-1 8.36e-2 3.41e-2];
+y_s = [5.58e-2 1.78e-2 3.45e-3 5.46e-4 4.86e-5];
+y_u = [3.97e-1 2.90e-1 1.58e-1 8.36e-2 4.81e-2];
 
 y_ht = zeros(1,5);
 y_st = zeros(1,5);
@@ -32,14 +32,13 @@ for snr = x
     y_st(snr-2) = pblk;
 end
 
-hold on
-
-plot(x, y_h)
-plot(x, y_ht)
-plot(x, y_s)
-plot(x, y_st)
-plot(x, y_u)
+semilogy(x, y_h,'LineWidth',2), grid, hold on
+semilogy(x, y_ht,'LineWidth',2)
+semilogy(x, y_s,'LineWidth',2)
+semilogy(x, y_st,'LineWidth',2)
+semilogy(x, y_u,'LineWidth',2)
 xlim([2 8])
-xlabel("Eb/N0 (dB)")
-ylabel("Block error probability")
-legend("Hard", "Hard (Theory)", "Soft", "Soft (Theory)", "Uncoded")
+xlabel('Eb/N0 (dB)')
+ylabel('Block error probability')
+legend('Hard', 'Hard (Theory)', 'Soft', 'Soft (Theory)', 'Uncoded')
+axis([3 7 1e-5 1])
